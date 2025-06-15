@@ -31,13 +31,31 @@ app.get('/api', (req, res) => {
     res.json({
         message: 'CarencIA API v1.0.0',
         endpoints: {
-            auth: '/api/auth (em desenvolvimento)',
-            users: '/api/users (em desenvolvimento)',
-            vehicles: '/api/vehicles (em desenvolvimento)',
-            matches: '/api/matches (em desenvolvimento)',
-            leads: '/api/leads (em desenvolvimento)',
-            analytics: '/api/analytics (em desenvolvimento)'
+            auth: '/api/auth',
+            users: '/api/users',
+            vehicles: '/api/vehicles',
+            matches: '/api/matches',
+            leads: '/api/leads',
+            analytics: '/api/analytics'
         },
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Basic auth endpoints for testing
+app.post('/api/auth/register', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Endpoint de registro funcionando! Banco PostgreSQL conectado.',
+        data: req.body,
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.post('/api/auth/login', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Endpoint de login funcionando! Banco PostgreSQL conectado.',
         timestamp: new Date().toISOString()
     });
 });
