@@ -1,0 +1,312 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserType {
+  BUYER
+  DEALERSHIP
+}
+
+enum LifestyleCategory {
+  URBANO
+  FAMILIA
+  AVENTUREIRO
+  EXECUTIVO
+}
+
+enum UrgencyLevel {
+  IMEDIATAMENTE
+  TRES_MESES
+  SEIS_MESES
+  PESQUISANDO
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+enum TransmissionType {
+  MANUAL
+  AUTOMATICO
+  CVT
+}
+
+enum FuelType {
+  GASOLINA
+  ETANOL
+  FLEX
+  DIESEL
+  ELETRICO
+  HIBRIDO
+}
+
+enum VehicleStatus {
+  DISPONIVEL
+  VENDIDO
+  RESERVADO
+}
+
+enum LeadStatus {
+  NOVO
+  CONTATADO
+  INTERESSADO
+  NEGOCIANDO
+  CONVERTIDO
+  PERDIDO
+}
+
+enum PlatformType {
+  FACEBOOK
+  GOOGLE
+  INSTAGRAM
+}
+
+// Models
+model User {
+  id                String             @id @default(cuid())
+  email             String             @unique
+  password          String?            // Opcional para OAuth
+  userType          UserType
+  fullName          String
+  phone             String?
+  avatarUrl         String?
+  interests         String[]
+  lifestyleCategory LifestyleCategory?
+  emailVerified     Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  // Relacionamentos
+  buyer                Buyer?
+  dealership           Dealership?
+  socialProfiles       SocialProfileData[]
+  matchesAsBuyer       Match[]                @relation("BuyerMatches")
+  leadsAsBuyer         Lead[]                 @relation("BuyerLeads")
+  leadsAsDealership    Lead[]                 @relation("DealershipLeads")
+  consentLogs          ConsentLog[]
+  sessions             UserSession[]
+
+  @@map("users")
+}
+
+model Buyer {
+  id                    String        @id @default(cuid())
+  userId                String        @unique
+  age                   Int?
+  budgetMin             Float?
+  budgetMax             Float?
+  location              String?
+  familySize            Int?
+  preferredBrands       String[]
+  financingNeeded       Boolean?
+  urgencyLevel          UrgencyLevel?
+  socialLifestyleScore  Float?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("buyers")
+}
+
+model Dealership {
+  id               String           @id @default(cuid())
+  userId           String           @unique
+  companyName      String
+  cnpj             String           @unique
+  address          String
+  city             String
+  state            String
+  zipCode          String?
+  brands           String[]
+  isActive         Boolean          @default(false)
+  subscriptionPlan SubscriptionPlan @default(FREE)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  // Relacionamentos
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicles Vehicle[]
+
+  @@map("dealerships")
+}
+
+model Vehicle {
+  id           String           @id @default(cuid())
+  dealershipId String
+  brand        String
+  model        String
+  year         Int
+  price        Float
+  kilometers   Int
+  color        String
+  transmission TransmissionType
+  fuelType     FuelType
+  features     String[]
+  images       String[]
+  status       VehicleStatus    @default(DISPONIVEL)
+  description  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  // Relacionamentos
+  dealership Dealership @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+  matches    Match[]
+  leads      Lead[]
+
+  @@map("vehicles")
+}
+
+model Match {
+  id                   String        @id @default(cuid())
+  buyerId              String
+  vehicleId            String
+  compatibilityScore   Float
+  socialInfluenceScore Float
+  matchFactors         Json // Array de MatchFactor
+  viewedAt             DateTime?
+  interested           Boolean?
+  createdAt            DateTime      @default(now())
+
+  // Relacionamentos
+  buyer   User    @relation("BuyerMatches", fields: [buyerId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([buyerId, vehicleId])
+  @@map("matches")
+}
+
+model Lead {
+  id           String     @id @default(cuid())
+  buyerId      String
+  dealershipId String
+  vehicleId    String
+  status       LeadStatus @default(NOVO)
+  score        Float
+  notes        String?
+  contactedAt  DateTime?
+  convertedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relacionamentos
+  buyer      User    @relation("BuyerLeads", fields: [buyerId], references: [id], onDelete: Cascade)
+  dealership User    @relation("DealershipLeads", fields: [dealershipId], references: [id], onDelete: Cascade)
+  vehicle    Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@map("leads")
+}
+
+model SocialProfileData {
+  id            String        @id @default(cuid())
+  userId        String
+  platform      PlatformType
+  profileId     String
+  username      String
+  bio           String?
+  followerCount Int?
+  profileData   Json
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relacionamentos
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts           SocialPost[]
+  lifestyleAnalysis LifestyleAnalysis?
+
+  @@unique([userId, platform])
+  @@map("social_profiles_data")
+}
+
+model SocialPost {
+  id              String            @id @default(cuid())
+  profileDataId   String
+  platform        PlatformType
+  content         String
+  hashtags        String[]
+  likeCount       Int?
+  postedAt        DateTime
+  createdAt       DateTime          @default(now())
+
+  // Relacionamentos
+  profileData SocialProfileData @relation(fields: [profileDataId], references: [id], onDelete: Cascade)
+
+  @@map("social_posts_data")
+}
+
+model LifestyleAnalysis {
+  id               String            @id @default(cuid())
+  profileDataId    String            @unique
+  lifestyleCategory LifestyleCategory
+  confidenceScore  Float
+  interests        String[]
+  carPreferences   Json // Array de CarPreference
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relacionamentos
+  profileData SocialProfileData @relation(fields: [profileDataId], references: [id], onDelete: Cascade)
+
+  @@map("lifestyle_analysis")
+}
+
+model ConsentLog {
+  id          String   @id @default(cuid())
+  userId      String
+  consentType String
+  granted     Boolean
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("consent_logs")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model Analytics {
+  id                    String   @id @default(cuid())
+  date                  DateTime @default(now())
+  totalBuyers           Int      @default(0)
+  totalDealerships      Int      @default(0)
+  totalVehicles         Int      @default(0)
+  totalMatches          Int      @default(0)
+  totalLeads            Int      @default(0)
+  conversionRate        Float    @default(0)
+  averageMatchScore     Float    @default(0)
+  totalSalesGenerated   Float    @default(0)
+  createdAt             DateTime @default(now())
+
+  @@map("analytics")
+}
