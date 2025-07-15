@@ -1,0 +1,330 @@
+// Schema Prisma para CarencIA - Sistema de Captação de Leads
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Concessionaria {
+  id                String   @id @default(cuid())
+  nome              String   @unique
+  slug              String   @unique // Para URLs amigáveis
+  cidade            String?
+  estado            String?
+  telefone          String?
+  email             String?
+  website           String?
+  
+  // Configurações de scraping
+  scraping_ativo    Boolean  @default(true)
+  scraping_config   Json?    // Configurações específicas (seletores, etc.)
+  ultima_sincronizacao DateTime?
+  
+  // Configurações de distribuição de leads
+  recebe_leads      Boolean  @default(true)
+  webhook_url       String?  // Para enviar leads automaticamente
+  
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  // Relacionamentos
+  veiculos          Veiculo[] @relation("ConcessionariaVeiculo")
+  leads             Lead[]    @relation("ConcessionariaLead")
+
+  @@map("concessionarias")
+}
+
+model Campanha {
+  id           String   @id @default(cuid())
+  nome         String   @unique
+  descricao    String?
+  utm_source   String?
+  utm_medium   String?
+  utm_campaign String?
+  utm_term     String?
+  utm_content  String?
+  ativo        Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  // Relacionamentos
+  leads Lead[]
+
+  @@map("campanhas")
+}
+
+model Veiculo {
+  id                 String    @id @default(cuid())
+  marca              String
+  modelo             String
+  versao             String?
+  ano                Int
+  combustivel        String
+  cambio             String?
+  cor                String?
+  km                 Int       @default(0)
+  preco              Decimal   @db.Decimal(12, 2)
+  preco_promocional  Decimal?  @db.Decimal(12, 2)
+  fotos              String[]
+  descricao          String?
+  opcionais          String[]
+  placa              String?
+  chassi             String?
+  renavam            String?
+  disponivel         Boolean   @default(true)
+  destaque           Boolean   @default(false)
+  
+  // Campos de tracking de origem/scraping
+  fonte_scraping     String?   // "robust_car", "concessionaria_parceira"
+  url_origem         String?   // URL original do anúncio
+  data_scraping      DateTime? // Quando foi capturado
+  ativo_origem       Boolean   @default(true) // Se ainda está disponível na fonte
+  concessionaria_id  String?   // ID da concessionária de origem
+  
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+
+  // Relacionamentos
+  concessionaria     Concessionaria? @relation("ConcessionariaVeiculo", fields: [concessionaria_id], references: [id])
+  leads_interessados Lead[]       @relation("VeiculoInteresse")
+  simulacoes         Simulacao[]
+  agendamentos       Agendamento[]
+  eventos            Evento[]
+
+  @@map("veiculos")
+}
+
+model Lead {
+  id                     String    @id @default(cuid())
+  nome                   String
+  email                  String
+  telefone               String
+  cpf                    String?
+  data_nascimento        DateTime?
+  profissao              String?
+  renda_mensal           Decimal?  @db.Decimal(12, 2)
+  
+  // Interesse em veículos
+  veiculo_interesse_id   String?
+  marca_interesse        String?
+  modelo_interesse       String?
+  faixa_preco_min        Decimal?  @db.Decimal(12, 2)
+  faixa_preco_max        Decimal?  @db.Decimal(12, 2)
+  ano_preferencia_min    Int?
+  ano_preferencia_max    Int?
+  combustivel_preferencia String?
+  
+  // Condições de compra
+  forma_pagamento        String?   // 'avista', 'financiado', 'consorcio'
+  tem_veiculo_troca      Boolean   @default(false)
+  veiculo_troca_marca    String?
+  veiculo_troca_modelo   String?
+  veiculo_troca_ano      Int?
+  prazo_compra           String?   // 'imediato', '30_dias', '60_dias', '90_dias'
+  
+  // Origem e tracking
+  campanha_id            String?
+  origem                 String    @default("website")
+  ip_address             String?
+  user_agent             String?
+  
+  // Tracking UTM para campanhas
+  utm_source             String?   // "facebook", "instagram", "google"
+  utm_medium             String?   // "cpc", "story", "post", "organic"
+  utm_campaign           String?   // "honda-civic-janeiro", "corolla-promo"
+  utm_content            String?   // "video-test-drive", "foto-destaque"
+  utm_term               String?   // "honda civic", "corolla usado"
+  custo_lead             Decimal?  @db.Decimal(10, 2) // Quanto custou capturar este lead
+  
+  // Distribuição de leads
+  concessionaria_responsavel_id String? // Para qual concessionária foi enviado
+  
+  // Status do lead
+  status                 String    @default("novo") // 'novo', 'contactado', 'qualificado', 'negociando', 'vendido', 'perdido'
+  temperatura            String    @default("frio") // 'frio', 'morno', 'quente'
+  score                  Int       @default(0)
+  
+  // Dados administrativos
+  vendedor_responsavel   String?
+  observacoes            String?
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+
+  // Relacionamentos
+  veiculo_interesse      Veiculo?     @relation("VeiculoInteresse", fields: [veiculo_interesse_id], references: [id])
+  campanha               Campanha?    @relation(fields: [campanha_id], references: [id])
+  concessionaria_responsavel Concessionaria? @relation("ConcessionariaLead", fields: [concessionaria_responsavel_id], references: [id])
+  interacoes             Interacao[]
+  simulacoes             Simulacao[]
+  agendamentos           Agendamento[]
+  eventos                Evento[]
+
+  @@map("leads")
+}
+
+model Interacao {
+  id          String   @id @default(cuid())
+  lead_id     String
+  tipo        String   // 'email', 'whatsapp', 'telefone', 'presencial', 'sistema'
+  canal       String?  // 'automatico', 'manual', 'bot'
+  assunto     String?
+  mensagem    String?
+  anexos      String[]
+  enviado_por String?
+  status      String   @default("enviado") // 'enviado', 'entregue', 'lido', 'respondido'
+  created_at  DateTime @default(now())
+
+  // Relacionamentos
+  lead Lead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@map("interacoes")
+}
+
+model Simulacao {
+  id               String   @id @default(cuid())
+  lead_id          String
+  veiculo_id       String?
+  valor_veiculo    Decimal  @db.Decimal(12, 2)
+  valor_entrada    Decimal  @db.Decimal(12, 2)
+  valor_financiado Decimal  @db.Decimal(12, 2)
+  prazo_meses      Int
+  taxa_juros       Decimal  @db.Decimal(5, 2)
+  valor_parcela    Decimal  @db.Decimal(12, 2)
+  valor_total      Decimal  @db.Decimal(12, 2)
+  banco            String?
+  aprovado         Boolean?
+  created_at       DateTime @default(now())
+
+  // Relacionamentos
+  lead    Lead     @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  veiculo Veiculo? @relation(fields: [veiculo_id], references: [id])
+
+  @@map("simulacoes")
+}
+
+model Agendamento {
+  id               String   @id @default(cuid())
+  lead_id          String
+  veiculo_id       String?
+  tipo             String   // 'test_drive', 'visita', 'avaliacao'
+  data_agendamento DateTime
+  status           String   @default("agendado") // 'agendado', 'confirmado', 'realizado', 'cancelado'
+  observacoes      String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  // Relacionamentos
+  lead    Lead     @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  veiculo Veiculo? @relation(fields: [veiculo_id], references: [id])
+
+  @@map("agendamentos")
+}
+
+model Evento {
+  id         String   @id @default(cuid())
+  lead_id    String?
+  veiculo_id String?
+  evento     String   // 'page_view', 'form_start', 'form_submit', 'cta_click', 'whatsapp_click'
+  pagina     String?
+  parametros Json?
+  ip_address String?
+  user_agent String?
+  created_at DateTime @default(now())
+
+  // Relacionamentos
+  lead    Lead?    @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  veiculo Veiculo? @relation(fields: [veiculo_id], references: [id])
+
+  @@map("eventos")
+}
+
+model Configuracao {
+  id         String   @id @default(cuid())
+  chave      String   @unique
+  valor      String
+  tipo       String   @default("string") // 'string', 'number', 'boolean', 'json'
+  descricao  String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("configuracoes")
+}
+
+// Enums para melhor type safety
+enum StatusLead {
+  novo
+  contactado
+  qualificado
+  negociando
+  vendido
+  perdido
+}
+
+enum TemperaturaLead {
+  frio
+  morno
+  quente
+}
+
+enum TipoInteracao {
+  email
+  whatsapp
+  telefone
+  presencial
+  sistema
+}
+
+enum StatusInteracao {
+  enviado
+  entregue
+  lido
+  respondido
+}
+
+enum TipoAgendamento {
+  test_drive
+  visita
+  avaliacao
+}
+
+enum StatusAgendamento {
+  agendado
+  confirmado
+  realizado
+  cancelado
+}
+
+enum FormaPagamento {
+  avista
+  financiado
+  consorcio
+}
+
+enum PrazoCompra {
+  imediato
+  trinta_dias
+  sessenta_dias
+  noventa_dias
+}
+
+enum TipoCombustivel {
+  flex
+  gasolina
+  etanol
+  diesel
+  hibrido
+  eletrico
+}
+
+enum TipoCambio {
+  manual
+  automatico
+  cvt
+  automatizado
+}
