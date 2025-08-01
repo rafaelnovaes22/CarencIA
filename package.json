@@ -14,19 +14,22 @@
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
     "extract:robust": "tsx scripts/extract-robust-car-photos.ts",
-    "extract:help": "echo 'Para usar a extração: 1) Configure FIRECRAWL_API_KEY no .env 2) Execute npm run extract:robust'"
+    "extract:enhanced": "tsx scripts/extract-robust-car-photos-enhanced.ts",
+    "extract:help": "echo 'Para usar a extração: 1) Configure FIRECRAWL_API_KEY no .env 2) Execute npm run extract:enhanced (versão com imagens HD)'"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@mendable/firecrawl-js": "^1.29.1",
     "@prisma/client": "^6.11.1",
     "@types/pg": "^8.15.4",
+    "@types/sharp": "^0.31.1",
     "next": "15.3.4",
     "openai": "^5.9.1",
     "pg": "^8.16.3",
     "prisma": "^6.11.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "sharp": "^0.34.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

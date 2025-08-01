@@ -71,7 +71,9 @@ model Veiculo {
   km                 Int       @default(0)
   preco              Decimal   @db.Decimal(12, 2)
   preco_promocional  Decimal?  @db.Decimal(12, 2)
-  fotos              String[]
+  fotos              String[]  // URLs das imagens (mantido para compatibilidade)
+  fotos_metadados    Json?     // Metadados das fotos (largura, altura, tamanho, etc.)
+  foto_principal     String?   // URL da foto principal em alta resolução
   descricao          String?
   opcionais          String[]
   placa              String?
@@ -96,8 +98,42 @@ model Veiculo {
   simulacoes         Simulacao[]
   agendamentos       Agendamento[]
   eventos            Evento[]
+  imagens            ImagemVeiculo[] // Relacionamento com imagens
 
   @@map("veiculos")
+}
+
+// Novo modelo para gerenciar imagens com metadados
+model ImagemVeiculo {
+  id                 String   @id @default(cuid())
+  veiculo_id         String
+  url_original       String   // URL original da fonte
+  url_local          String?  // Path local da imagem salva
+  url_thumbnail      String?  // URL do thumbnail otimizado
+  url_medium         String?  // URL da versão média
+  url_large          String?  // URL da versão grande
+  
+  // Metadados da imagem
+  largura            Int?     // Largura original
+  altura             Int?     // Altura original
+  tamanho_bytes      Int?     // Tamanho em bytes
+  formato            String?  // jpg, png, webp
+  qualidade_score    Int?     // Score de qualidade (0-100)
+  
+  // Controle
+  is_principal       Boolean  @default(false)
+  ordem              Int      @default(0)
+  processado         Boolean  @default(false)
+  erro_download      String?  // Se houve erro no download
+  
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  // Relacionamentos  
+  veiculo            Veiculo  @relation(fields: [veiculo_id], references: [id], onDelete: Cascade)
+
+  @@map("imagens_veiculos")
+  @@index([veiculo_id])
 }
 
 model Lead {
